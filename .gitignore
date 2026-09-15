@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+*.env
+!.env.example
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+.dist/
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+*.swp
