@@ -10,11 +10,13 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.schemas.recommendation import (
     AlternativeDestinationsResponse,
+    AlternativeRecommendationRequest,
     RecommendationRequest,
     RecommendationResponse,
 )
 from app.services.recommendation_engine import (
     find_alternative_destinations,
+    get_alternatives_for_request,
     get_recommendations,
 )
 
@@ -68,11 +70,30 @@ def create_recommendations(
     return get_recommendations(request=request, db=db)
 
 
+@router.post(
+    "/alternatives",
+    response_model=AlternativeDestinationsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Find alternative destinations for an overcrowded or preferred site via POST",
+)
+def create_alternative_recommendations(
+    request: AlternativeRecommendationRequest = Body(...),
+    db: Session = Depends(get_db),
+) -> Any:
+    """
+    Find lower-crowd or thematic alternatives for a preferred destination:
+    - Evaluates destination similarity and crowd pressure relief.
+    - Filters out the preferred destination (never returns itself as an alternative).
+    - Provides transparent explanations comparing crowd levels.
+    """
+    return get_alternatives_for_request(request=request, db=db)
+
+
 @router.get(
     "/alternatives/{destination_id}",
     response_model=AlternativeDestinationsResponse,
     status_code=status.HTTP_200_OK,
-    summary="Find alternative destinations for a specific site (Step 4 Scaffolding)",
+    summary="Find alternative destinations for a specific site by ID (GET)",
 )
 def get_alternatives_for_destination(
     destination_id: int,
@@ -80,7 +101,7 @@ def get_alternatives_for_destination(
     db: Session = Depends(get_db),
 ) -> Any:
     """
-    Scaffolding endpoint: Retrieves lower-crowd or hidden-gem alternatives for a destination.
-    Lays the foundation for future overcrowding-redirection workflows.
+    Retrieves lower-crowd or hidden-gem alternatives for a destination by ID.
+    Lays the foundation for overcrowding-redirection workflows.
     """
     return find_alternative_destinations(destination_id=destination_id, limit=limit, db=db)

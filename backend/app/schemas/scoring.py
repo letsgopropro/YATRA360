@@ -3,7 +3,7 @@ YATRA360 — Scoring Engine Schemas
 Defines request and response models for destination suitability scoring.
 """
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -16,9 +16,21 @@ class TravelRequest(BaseModel):
         default=None,
         description="Target destination, city, or region (e.g. 'Jaipur')"
     )
+    preferred_destination: Optional[str] = Field(
+        default=None,
+        description="Alternative alias for target destination"
+    )
+    origin: Optional[str] = Field(
+        default=None,
+        description="Origin city or location name"
+    )
     interests: Optional[List[str]] = Field(
         default_factory=list,
         description="Preferred categories or themes (e.g. ['Culture', 'Nature'])"
+    )
+    preferred_activities: Optional[List[str]] = Field(
+        default_factory=list,
+        description="Preferred specific activities (e.g. ['trekking', 'photography'])"
     )
     budget: Optional[float] = Field(
         default=None,
@@ -36,7 +48,7 @@ class TravelRequest(BaseModel):
     )
     travel_group: Optional[str] = Field(
         default=None,
-        description="Travel group composition: 'Solo', 'Couple', 'Family', 'Friends'"
+        description="Travel group composition: 'Solo', 'Couple', 'Family', 'Friends', 'Senior'"
     )
     user_latitude: Optional[float] = Field(
         default=None,
@@ -59,6 +71,10 @@ class TravelRequest(BaseModel):
         default=False,
         description="True if step-free / wheelchair accessibility is needed"
     )
+    accessibility_requirements: Optional[str] = Field(
+        default=None,
+        description="Specific accessibility requirement description"
+    )
     preferred_crowd_level: Optional[str] = Field(
         default=None,
         description="Preferred crowd level: 'low', 'moderate', or 'high'"
@@ -70,6 +86,10 @@ class TravelRequest(BaseModel):
     weather_preference: Optional[str] = Field(
         default=None,
         description="Weather/climate preference (e.g. 'cool', 'warm', 'pleasant')"
+    )
+    preferred_weather: Optional[str] = Field(
+        default=None,
+        description="Alias for weather preference"
     )
 
     model_config = ConfigDict(extra="ignore")
@@ -105,13 +125,16 @@ class DataCollectionResponse(BaseModel):
 
 
 class ScoringComponents(BaseModel):
-    """Normalized 0-100 score for each evaluation component."""
-    preference_match: float = Field(..., ge=0.0, le=100.0)
-    safety: float = Field(..., ge=0.0, le=100.0)
-    crowd_suitability: float = Field(..., ge=0.0, le=100.0)
-    accessibility_distance: float = Field(..., ge=0.0, le=100.0)
-    cost_suitability: float = Field(..., ge=0.0, le=100.0)
-    weather_condition: float = Field(..., ge=0.0, le=100.0)
+    """
+    Normalized 0-100 score for each evaluation component.
+    Can be None if data is genuinely unavailable and weight was renormalized.
+    """
+    preference_match: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    safety: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    crowd_suitability: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    accessibility_distance: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    cost_suitability: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    weather_condition: Optional[float] = Field(default=None, ge=0.0, le=100.0)
 
 
 class ScoringWeights(BaseModel):
@@ -124,6 +147,16 @@ class ScoringWeights(BaseModel):
     weather_condition: float = 0.10
 
 
+class ScoreBreakdown(BaseModel):
+    """Standardized breakdown keys as requested in YATRA360 proposal."""
+    preference: Optional[float] = None
+    safety: Optional[float] = None
+    crowd: Optional[float] = None
+    accessibility: Optional[float] = None
+    cost: Optional[float] = None
+    weather: Optional[float] = None
+
+
 class DestinationScoreResponse(BaseModel):
     """Complete scoring response detailing overall score, components, and explanations."""
     destination_id: int
@@ -131,7 +164,19 @@ class DestinationScoreResponse(BaseModel):
     destination_slug: str
     overall_score: float = Field(..., ge=0.0, le=100.0)
     components: ScoringComponents
+    score_breakdown: Dict[str, Optional[float]] = Field(
+        default_factory=dict,
+        description="Standardized component breakdown: preference, safety, crowd, accessibility, cost, weather"
+    )
     weights: ScoringWeights
+    applied_weights: Dict[str, float] = Field(
+        default_factory=dict,
+        description="Effective weights applied after dynamic weight renormalization"
+    )
+    data_quality: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Source status for each component: 'real', 'fallback', or 'missing'"
+    )
     explanations: Dict[str, str] = Field(
         default_factory=dict,
         description="Transparent breakdown explaining the score rationale"

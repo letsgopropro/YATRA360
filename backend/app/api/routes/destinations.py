@@ -16,8 +16,10 @@ from app.schemas.safety import SafetyResponse
 from app.schemas.scoring import (
     CollectedDestination,
     DataCollectionResponse,
+    DestinationScoreResponse,
     TravelRequest,
 )
+from app.services.scoring_engine import calculate_destination_score
 
 router = APIRouter(prefix="/destinations", tags=["Destinations"])
 
@@ -336,3 +338,28 @@ def create_destination_review(
         created_at=review.created_at,
         user_name=current_user.full_name
     )
+
+
+@router.post(
+    "/{destination_id}/score",
+    response_model=DestinationScoreResponse,
+    summary="Calculate suitability score for a destination",
+)
+def score_destination_endpoint(
+    destination_id: int,
+    travel_request: Optional[TravelRequest] = Body(default=None),
+    db: Session = Depends(get_db),
+) -> Any:
+    """
+    Calculate transparent multi-criteria suitability score for a single destination.
+    Accepts user travel preferences or applies neutral prototype baselines / renormalization.
+    """
+    destination = db.scalar(select(Destination).where(Destination.id == destination_id))
+    if not destination:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Destination with ID {destination_id} not found",
+        )
+    req = travel_request or TravelRequest()
+    return calculate_destination_score(destination=destination, travel_request=req)
+

@@ -61,6 +61,9 @@ class RecommendationItem(BaseModel):
     estimated_visit_duration: Optional[int] = None
     overall_score: float = Field(..., ge=0.0, le=100.0)
     components: ScoringComponents
+    score_breakdown: Optional[Dict[str, Optional[float]]] = None
+    data_quality: Optional[Dict[str, str]] = None
+    is_alternative: bool = False
     reasons: List[str] = Field(
         default_factory=list,
         description="3-5 concise, transparent reasons explaining why this destination was recommended"
@@ -79,10 +82,33 @@ class RecommendationResponse(BaseModel):
     scoring_version: str = "1.0-weighted-content"
 
 
+class AlternativeRecommendationRequest(BaseModel):
+    """Request model for finding alternative destinations for a preferred/overcrowded site."""
+    preferred_destination_id: Optional[int] = Field(
+        default=None,
+        description="Database primary key ID of preferred destination"
+    )
+    preferred_destination_name: Optional[str] = Field(
+        default=None,
+        description="Name or search string of preferred destination"
+    )
+    user_preferences: Optional[TravelRequest] = Field(
+        default=None,
+        description="User travel constraints and preferences"
+    )
+    limit: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Maximum number of alternatives to return"
+    )
+
+
 class AlternativeDestinationsResponse(BaseModel):
-    """Scaffolding response containing alternatives for a specific destination."""
+    """Response containing alternatives for a specific destination."""
     source_destination_id: int
     source_destination_name: str
     source_crowd_level: str
+    is_source_overcrowded: bool = False
     alternatives_count: int
     alternatives: List[RecommendationItem]

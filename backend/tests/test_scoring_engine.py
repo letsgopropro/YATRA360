@@ -70,8 +70,8 @@ def make_dummy_destination(
 def test_preference_match_no_interests_returns_neutral():
     dest = make_dummy_destination(category="Nature")
     score, expl = calculate_preference_match(dest, TravelRequest())
-    assert score == 70.0
-    assert "open neutral baseline" in expl.lower()
+    assert score is None
+    assert "renormalized" in expl.lower()
 
 
 def test_preference_match_exact_category():
