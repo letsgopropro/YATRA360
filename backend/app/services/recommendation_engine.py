@@ -282,11 +282,18 @@ def recommend_alternatives(
     preferred_crowd = (getattr(preferred_destination, "base_crowd_level", "moderate") or "moderate").lower()
 
     # Rule: Never recommend the preferred destination as its own alternative
-    candidates = [
-        d for d in destinations
-        if (preferred_id is None or getattr(d, "id", None) != preferred_id)
-        and (not preferred_slug or getattr(d, "slug", None) != preferred_slug)
-    ]
+    candidates = []
+    for d in destinations:
+        d_id = getattr(d, "id", None)
+        d_slug = getattr(d, "slug", None)
+        if preferred_id is not None and d_id is not None:
+            if d_id == preferred_id:
+                continue
+        elif preferred_slug and d_slug and d_slug == preferred_slug:
+            continue
+        elif getattr(d, "name", None) and getattr(d, "name", "") == getattr(preferred_destination, "name", ""):
+            continue
+        candidates.append(d)
 
     req = user_preferences or TravelRequest()
     alternatives_scored: List[Dict[str, Any]] = []
