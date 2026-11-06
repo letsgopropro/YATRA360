@@ -10,26 +10,32 @@ import EmptyState from '../components/EmptyState';
 export default function Destinations() {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Read URL query params
-  const initialSearch = searchParams.get('search') || '';
-  const initialCategory = searchParams.get('category') || undefined;
-  const initialState = searchParams.get('state') || undefined;
-  const initialCrowd = searchParams.get('crowd_level') || undefined;
-  const initialGem = searchParams.get('is_hidden_gem')
-    ? searchParams.get('is_hidden_gem') === 'true'
-    : undefined;
+  // Read URL query params directly from searchParams
+  const urlSearch = searchParams.get('search') || '';
+  const urlCategory = searchParams.get('category') || undefined;
+  const urlState = searchParams.get('state') || undefined;
+  const urlCrowd = searchParams.get('crowd_level') || undefined;
+  const urlGem =
+    searchParams.get('is_hidden_gem') !== null
+      ? searchParams.get('is_hidden_gem') === 'true'
+      : undefined;
 
-  const [searchQuery, setSearchQuery] = useState(initialSearch);
-  const [filters, setFilters] = useState({
-    category: initialCategory,
-    state: initialState,
-    crowd_level: initialCrowd,
-    is_hidden_gem: initialGem,
-  });
-
+  const [searchQuery, setSearchQuery] = useState(urlSearch);
   const [destinations, setDestinations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Keep searchQuery input in sync when URL search param changes externally
+  useEffect(() => {
+    setSearchQuery(urlSearch);
+  }, [urlSearch]);
+
+  const filters = {
+    category: urlCategory,
+    state: urlState,
+    crowd_level: urlCrowd,
+    is_hidden_gem: urlGem,
+  };
 
   // Sync URL search params
   const updateUrlParams = useCallback((newSearch, newFilters) => {
@@ -50,11 +56,11 @@ export default function Destinations() {
     try {
       const queryParams = {
         limit: 60,
-        search: searchQuery.trim() || undefined,
-        category: filters.category || undefined,
-        state: filters.state || undefined,
-        crowd_level: filters.crowd_level || undefined,
-        is_hidden_gem: filters.is_hidden_gem,
+        search: urlSearch.trim() || undefined,
+        category: urlCategory,
+        state: urlState,
+        crowd_level: urlCrowd,
+        is_hidden_gem: urlGem,
       };
 
       const data = await listDestinations(queryParams);
@@ -64,36 +70,25 @@ export default function Destinations() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, filters]);
+  }, [urlSearch, urlCategory, urlState, urlCrowd, urlGem]);
 
   useEffect(() => {
     fetchDestinations();
   }, [fetchDestinations]);
 
   const handleFilterChange = (partialFilter) => {
-    setFilters((prev) => {
-      const updated = { ...prev, ...partialFilter };
-      updateUrlParams(searchQuery, updated);
-      return updated;
-    });
+    const updated = { ...filters, ...partialFilter };
+    updateUrlParams(searchQuery, updated);
   };
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    updateUrlParams(searchQuery, filters);
-    fetchDestinations();
+    updateUrlParams(searchQuery.trim(), filters);
   };
 
   const handleClearFilters = () => {
     setSearchQuery('');
-    const emptyFilters = {
-      category: undefined,
-      state: undefined,
-      crowd_level: undefined,
-      is_hidden_gem: undefined,
-    };
-    setFilters(emptyFilters);
-    updateUrlParams('', emptyFilters);
+    setSearchParams(new URLSearchParams(), { replace: true });
   };
 
   return (

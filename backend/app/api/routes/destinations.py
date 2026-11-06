@@ -19,6 +19,10 @@ from app.schemas.scoring import (
     DestinationScoreResponse,
     TravelRequest,
 )
+from app.services.preference_matcher import (
+    THEMATIC_INTEREST_CORRELATIONS,
+    resolve_canonical_category,
+)
 from app.services.scoring_engine import calculate_destination_score
 
 router = APIRouter(prefix="/destinations", tags=["Destinations"])
@@ -68,13 +72,19 @@ def collect_destination_data(
 
     # Filter by category if interests provided and not filtering by a single specific monument
     if travel_request.interests and not travel_request.destination:
-        category_clauses = [
-            Destination.category.ilike(f"%{interest.strip()}%")
-            for interest in travel_request.interests
-            if interest.strip()
-        ]
-        if category_clauses:
-            stmt = stmt.where(or_(*category_clauses))
+        resolved_categories = set()
+        for interest in travel_request.interests:
+            canon = resolve_canonical_category(interest)
+            if canon:
+                resolved_categories.add(canon)
+            elif interest.strip().lower() in THEMATIC_INTEREST_CORRELATIONS:
+                resolved_categories.update(
+                    THEMATIC_INTEREST_CORRELATIONS[interest.strip().lower()]["correlated_categories"]
+                )
+            elif interest.strip():
+                resolved_categories.add(interest.strip())
+        if resolved_categories:
+            stmt = stmt.where(Destination.category.in_(list(resolved_categories)))
 
     destinations = db.scalars(stmt.limit(50)).all()
 
@@ -128,12 +138,32 @@ def list_destinations(
     """
     stmt = select(Destination)
 
-    if category:
-        stmt = stmt.where(Destination.category.ilike(f"%{category.strip()}%"))
+    if category and category.strip().lower() != "all":
+        clean_cat = category.strip()
+        canon = resolve_canonical_category(clean_cat)
+        if canon:
+            stmt = stmt.where(Destination.category.ilike(f"%{canon}%"))
+        elif clean_cat.lower() in THEMATIC_INTEREST_CORRELATIONS:
+            corr_cats = THEMATIC_INTEREST_CORRELATIONS[clean_cat.lower()]["correlated_categories"]
+            stmt = stmt.where(Destination.category.in_(list(corr_cats)))
+        else:
+            stmt = stmt.where(Destination.category.ilike(f"%{clean_cat}%"))
     if city:
         stmt = stmt.where(Destination.city.ilike(f"%{city.strip()}%"))
-    if state:
-        stmt = stmt.where(Destination.state.ilike(f"%{state.strip()}%"))
+    if state and state.strip().lower() not in ("all", "all states"):
+        clean_state = state.strip()
+        if "jammu" in clean_state.lower():
+            stmt = stmt.where(
+                (Destination.state.ilike("%Jammu & Kashmir%"))
+                | (Destination.state.ilike("%Jammu and Kashmir%"))
+            )
+        elif "andaman" in clean_state.lower():
+            stmt = stmt.where(
+                (Destination.state.ilike("%Andaman & Nicobar%"))
+                | (Destination.state.ilike("%Andaman and Nicobar%"))
+            )
+        else:
+            stmt = stmt.where(Destination.state.ilike(f"%{clean_state}%"))
     if is_hidden_gem is not None:
         stmt = stmt.where(Destination.is_hidden_gem == is_hidden_gem)
     if crowd_level:
@@ -144,7 +174,7 @@ def list_destinations(
             (Destination.name.ilike(term)) | (Destination.description.ilike(term))
         )
 
-    stmt = stmt.offset(skip).limit(limit)
+    stmt = stmt.order_by(Destination.id).offset(skip).limit(limit)
     destinations = db.scalars(stmt).all()
     return destinations
 

@@ -20,6 +20,13 @@ export default function Recommendations() {
   const [activeAlternativeModal, setActiveAlternativeModal] = useState(null);
   const [loadingAlternatives, setLoadingAlternatives] = useState(false);
 
+  // Sync state if navigation provides fresh recommendations data
+  useEffect(() => {
+    if (location.state?.recommendationsData) {
+      setRecommendationsData(location.state.recommendationsData);
+    }
+  }, [location.state?.recommendationsData]);
+
   useEffect(() => {
     // If state was not passed via navigation, check sessionStorage
     if (!recommendationsData) {
@@ -153,7 +160,17 @@ export default function Recommendations() {
           </div>
         )}
 
-        {filteredItems.length === 0 ? (
+        {items.length === 0 ? (
+          <div className="state-container">
+            <h3 className="state-title">No destinations match your criteria</h3>
+            <p className="state-text">
+              Try adjusting your travel preferences, increasing budget, or selecting different themes.
+            </p>
+            <Link to="/recommend" className="state-action-btn">
+              Adjust Preferences
+            </Link>
+          </div>
+        ) : filteredItems.length === 0 ? (
           <div className="state-container">
             <h3 className="state-title">No recommendations match category "{selectedCategory}"</h3>
             <p className="state-text">Select "All" to view all ranked recommendations.</p>

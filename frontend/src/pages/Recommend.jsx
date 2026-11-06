@@ -30,16 +30,41 @@ export default function Recommend() {
 
   const initialCat = searchParams.get('category');
 
+  // Attempt to restore cached preferences if user clicked Adjust Preferences
+  const cached = React.useMemo(() => {
+    if (initialCat) return null;
+    try {
+      const raw = sessionStorage.getItem('yatra360_preferences');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, [initialCat]);
+
   // Form states
   const [selectedInterests, setSelectedInterests] = useState(
-    initialCat ? [initialCat] : ['Nature', 'Heritage']
+    initialCat
+      ? [initialCat]
+      : cached?.interests || ['Nature', 'Heritage']
   );
-  const [budget, setBudget] = useState(15000);
-  const [availableTimeIdx, setAvailableTimeIdx] = useState(3); // '3 – 5 days'
-  const [crowdLevel, setCrowdLevel] = useState('moderate');
-  const [hiddenGems, setHiddenGems] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState(initialCat || '');
-  const [limit, setLimit] = useState(10);
+  const [budget, setBudget] = useState(cached?.budget || 15000);
+  const [availableTimeIdx, setAvailableTimeIdx] = useState(() => {
+    if (cached?.available_time) {
+      const foundIdx = TIME_OPTIONS.findIndex((t) => t.text === cached.available_time);
+      if (foundIdx !== -1) return foundIdx;
+    }
+    return 3; // '3 – 5 days'
+  });
+  const [crowdLevel, setCrowdLevel] = useState(
+    cached?.preferred_crowd_level !== undefined ? cached.preferred_crowd_level : 'moderate'
+  );
+  const [hiddenGems, setHiddenGems] = useState(
+    cached?.prefer_hidden_gems !== undefined ? cached.prefer_hidden_gems : true
+  );
+  const [selectedCategory, setSelectedCategory] = useState(
+    initialCat || cached?.category || ''
+  );
+  const [limit, setLimit] = useState(cached?.limit || 10);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -226,6 +251,7 @@ export default function Recommend() {
                 <option value="Hill Station">Hill Station</option>
                 <option value="Spiritual">Spiritual</option>
                 <option value="Wildlife">Wildlife</option>
+                <option value="Cultural">Cultural & Folk</option>
               </select>
             </div>
 

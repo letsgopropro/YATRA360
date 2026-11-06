@@ -2,7 +2,8 @@
  * YATRA360 — Curated Destination Imagery & Fallback System
  * Provides high-resolution, reliable travel photography tailored to Indian destinations.
  * In compliance with zero-broken-image policies, gracefully cascades from database
- * URLs to specific destination photography to category-level photography.
+ * URLs to specific destination photography to category-level photography, with an
+ * inline SVG data-URI as the ultimate offline fallback.
  */
 
 // Category curated imagery
@@ -25,6 +26,29 @@ export const CATEGORY_FALLBACK_IMAGES = {
     'https://images.unsplash.com/photo-1600100397608-f010f4439c27?auto=format&fit=crop&w=1200&q=80',
 };
 
+// Canonical mapping for category normalization
+const CATEGORY_MAP = {
+  culture: 'Cultural',
+  cultural: 'Cultural',
+  history: 'Heritage',
+  heritage: 'Heritage',
+  nature: 'Nature',
+  natural: 'Nature',
+  adventure: 'Adventure',
+  beach: 'Beach',
+  beaches: 'Beach',
+  spiritual: 'Spiritual',
+  wildlife: 'Wildlife',
+  'hill station': 'Hill Station',
+  hillstation: 'Hill Station',
+  hills: 'Hill Station',
+  photography: 'Nature',
+  wellness: 'Spiritual',
+};
+
+export const SVG_FALLBACK_DATA_URI =
+  "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='500' viewBox='0 0 800 500'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231e293b'/%3E%3Cstop offset='100%25' stop-color='%230f172a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23g)'/%3E%3Ccircle cx='400' cy='220' r='55' fill='%23334155'/%3E%3Ctext x='400' y='235' font-size='38' text-anchor='middle' fill='%2394a3b8'%3E%F0%9F%8F%9E%EF%B8%8F%3C/text%3E%3Ctext x='400' y='320' font-family='system-ui,-apple-system,sans-serif' font-size='20' font-weight='600' text-anchor='middle' fill='%23f8fafc'%3EYATRA360 Destination%3C/text%3E%3C/svg%3E";
+
 // Destination specific mappings
 const DESTINATION_IMAGE_MAP = {
   // Northern India & Himalayas
@@ -41,7 +65,7 @@ const DESTINATION_IMAGE_MAP = {
   'mcleod-ganj': 'https://images.unsplash.com/photo-1571401835393-8c5f35328320?auto=format&fit=crop&w=1200&q=80',
   'leh-ladakh': 'https://images.unsplash.com/photo-1581793745862-99fde7fa73d2?auto=format&fit=crop&w=1200&q=80',
   'pangong': 'https://images.unsplash.com/photo-1581793745862-99fde7fa73d2?auto=format&fit=crop&w=1200&q=80',
-  
+
   // Western India & Rajasthan
   'jaipur': 'https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=1200&q=80',
   'hawa-mahal': 'https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=1200&q=80',
@@ -75,14 +99,23 @@ export const DEFAULT_TRAVEL_HERO =
   'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1920&q=85';
 
 /**
+ * Resolve canonical category name safely
+ */
+export function resolveCategoryName(rawCategory) {
+  if (!rawCategory || typeof rawCategory !== 'string') return null;
+  const key = rawCategory.trim().toLowerCase();
+  return CATEGORY_MAP[key] || rawCategory;
+}
+
+/**
  * Returns a high-res travel image URL for a destination.
  */
 export function getDestinationImageUrl(destination) {
   if (!destination) return DEFAULT_TRAVEL_HERO;
 
   // 1. If backend has an image URL
-  if (destination.image_url && destination.image_url.trim().length > 0) {
-    return destination.image_url;
+  if (destination.image_url && typeof destination.image_url === 'string' && destination.image_url.trim().length > 0) {
+    return destination.image_url.trim();
   }
 
   // 2. Check by slug keywords or name keywords
@@ -95,10 +128,10 @@ export function getDestinationImageUrl(destination) {
     }
   }
 
-  // 3. Fallback to category
-  const category = destination.category;
-  if (category && CATEGORY_FALLBACK_IMAGES[category]) {
-    return CATEGORY_FALLBACK_IMAGES[category];
+  // 3. Fallback to category with normalization
+  const resolvedCategory = resolveCategoryName(destination.category);
+  if (resolvedCategory && CATEGORY_FALLBACK_IMAGES[resolvedCategory]) {
+    return CATEGORY_FALLBACK_IMAGES[resolvedCategory];
   }
 
   // 4. Default aesthetic scenery
@@ -106,11 +139,25 @@ export function getDestinationImageUrl(destination) {
 }
 
 /**
- * Image error handler to replace broken URLs with category-level safe photography.
+ * Image error handler to replace broken URLs with category-level safe photography,
+ * cascading to an inline SVG if remote network images fail.
  */
 export function handleImageError(e, category) {
-  e.currentTarget.onerror = null; // Prevent infinite loop
-  const fallback =
-    (category && CATEGORY_FALLBACK_IMAGES[category]) || DEFAULT_TRAVEL_HERO;
-  e.currentTarget.src = fallback;
+  const target = e.currentTarget;
+  if (!target) return;
+
+  const resolvedCategory = resolveCategoryName(category);
+  const categoryFallback =
+    (resolvedCategory && CATEGORY_FALLBACK_IMAGES[resolvedCategory]) || DEFAULT_TRAVEL_HERO;
+
+  // If we haven't tried the category fallback yet, try it once
+  if (!target.dataset.fallbackTried && target.src !== categoryFallback) {
+    target.dataset.fallbackTried = 'true';
+    target.src = categoryFallback;
+    return;
+  }
+
+  // If category fallback failed or was already attempted, use guaranteed inline SVG
+  target.onerror = null; // Prevent any further onerror triggers
+  target.src = SVG_FALLBACK_DATA_URI;
 }

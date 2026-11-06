@@ -8,6 +8,8 @@ from app.main import app
 from app.models.business import Business
 from app.models.crowd_metric import CrowdMetric
 from app.models.destination import Destination
+from app.models.itinerary_item import ItineraryItem
+from app.models.review import Review
 from app.models.safety import Safety
 from app.models.user import User
 
@@ -76,12 +78,36 @@ def seeded_data():
     biz_id = biz.id
     db.close()
 
-    yield {
-        "dest_id": dest_id,
-        "dest_slug": dest_slug,
-        "biz_id": biz_id,
-        "suffix": suffix,
-    }
+    try:
+        yield {
+            "dest_id": dest_id,
+            "dest_slug": dest_slug,
+            "biz_id": biz_id,
+            "suffix": suffix,
+        }
+    finally:
+        cleanup_db = SessionLocal()
+        try:
+            # Delete child references first to prevent foreign key constraint violations
+            cleanup_db.query(Review).filter(Review.destination_id == dest_id).delete(synchronize_session=False)
+            cleanup_db.query(ItineraryItem).filter(ItineraryItem.destination_id == dest_id).delete(synchronize_session=False)
+            cleanup_db.query(Business).filter(Business.id == biz_id).delete(synchronize_session=False)
+            cleanup_db.query(Safety).filter(Safety.destination_id == dest_id).delete(synchronize_session=False)
+            cleanup_db.query(CrowdMetric).filter(CrowdMetric.destination_id == dest_id).delete(synchronize_session=False)
+            cleanup_db.query(Destination).filter(Destination.id == dest_id).delete(synchronize_session=False)
+            cleanup_db.commit()
+        except Exception as exc:
+            cleanup_db.rollback()
+            import logging
+            logging.getLogger(__name__).warning(
+                "Failed to clean up seeded test fixture data (dest_id=%s, biz_id=%s): %s",
+                dest_id,
+                biz_id,
+                exc,
+                exc_info=True,
+            )
+        finally:
+            cleanup_db.close()
 
 
 # ============================================================================

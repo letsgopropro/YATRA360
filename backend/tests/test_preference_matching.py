@@ -79,3 +79,51 @@ def test_hidden_gem_alignment_bonus():
     score_mismatch, _ = calculate_preference_match(dest, req_mismatch)
 
     assert score_match > score_mismatch
+
+
+def test_culture_matches_cultural_category():
+    dest = make_dummy_destination(category="Cultural", description="Traditional folk crafts village.")
+    req = TravelRequest(interests=["Culture"])
+    score, expl = calculate_preference_match(dest, req)
+    assert score is not None
+    assert score >= 90.0
+    assert "Direct category match for interest 'Culture' mapped to 'Cultural'" in expl
+
+
+def test_history_matches_heritage_category():
+    dest = make_dummy_destination(category="Heritage", description="Ancient fortress with centuries of history.")
+    req = TravelRequest(interests=["History"])
+    score, expl = calculate_preference_match(dest, req)
+    assert score is not None
+    assert score >= 90.0
+    assert "Direct category match for interest 'History' mapped to 'Heritage'" in expl
+
+
+def test_photography_thematic_correlation():
+    dest = make_dummy_destination(category="Nature", description="Scenic mountain vistas and sunset points.")
+    req = TravelRequest(interests=["Photography"])
+    score, expl = calculate_preference_match(dest, req)
+    assert score is not None
+    assert score == 75.0
+    assert "Photography affinity aligned with Nature" in expl
+    assert "Database does not define a dedicated 'Photography' category" in expl
+
+
+def test_wellness_thematic_correlation():
+    dest = make_dummy_destination(category="Spiritual", description="Tranquil meditation center on the banks of a holy river.")
+    req = TravelRequest(interests=["Wellness"])
+    score, expl = calculate_preference_match(dest, req)
+    assert score is not None
+    assert score == 75.0
+    assert "Wellness affinity aligned with Spiritual" in expl
+    assert "Database does not define a dedicated 'Wellness' category" in expl
+
+
+def test_photography_mismatch_truthful_explanation():
+    dest = make_dummy_destination(category="Adventure", description="Extreme white-water rafting.")
+    req = TravelRequest(interests=["Photography"])
+    score, expl = calculate_preference_match(dest, req)
+    assert score is not None
+    assert score <= 25.0
+    assert "database has no dedicated category for these interests" in expl.lower()
+

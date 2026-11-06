@@ -21,6 +21,10 @@ from app.services.destination_similarity import (
     DEFAULT_SIMILARITY_WEIGHTS,
     calculate_destination_similarity,
 )
+from app.services.preference_matcher import (
+    THEMATIC_INTEREST_CORRELATIONS,
+    resolve_canonical_category,
+)
 from app.services.scoring_engine import (
     calculate_destination_score,
     is_overcrowded,
@@ -60,6 +64,10 @@ def generate_recommendation_reasons(
         if comp.preference_match >= 85.0:
             reasons.append(
                 f"Strong match for your travel interests in the {getattr(destination, 'category', 'General')} category."
+            )
+        elif comp.preference_match >= 70.0:
+            reasons.append(
+                f"Scenic setting and atmosphere in {getattr(destination, 'category', 'General')} align with your travel interests."
             )
         elif comp.preference_match >= 45.0:
             reasons.append(
@@ -395,13 +403,36 @@ def get_recommendations(
     stmt = select(Destination)
     applied_filters: Dict[str, Any] = {}
 
-    if request.category:
-        stmt = stmt.where(Destination.category.ilike(f"%{request.category.strip()}%"))
-        applied_filters["category"] = request.category.strip()
+    if request.category and request.category.strip().lower() != "all":
+        clean_cat = request.category.strip()
+        canonical_cat = resolve_canonical_category(clean_cat)
+        if canonical_cat:
+            stmt = stmt.where(Destination.category.ilike(f"%{canonical_cat}%"))
+            applied_filters["category"] = canonical_cat
+        elif clean_cat.lower() in THEMATIC_INTEREST_CORRELATIONS:
+            corr = THEMATIC_INTEREST_CORRELATIONS[clean_cat.lower()]
+            stmt = stmt.where(Destination.category.in_(list(corr["correlated_categories"])))
+            applied_filters["category"] = clean_cat
+            applied_filters["category_note"] = corr["note"]
+        else:
+            stmt = stmt.where(Destination.category.ilike(f"%{clean_cat}%"))
+            applied_filters["category"] = clean_cat
 
-    if request.state:
-        stmt = stmt.where(Destination.state.ilike(f"%{request.state.strip()}%"))
-        applied_filters["state"] = request.state.strip()
+    if request.state and request.state.strip().lower() not in ("all", "all states"):
+        clean_state = request.state.strip()
+        if "jammu" in clean_state.lower():
+            stmt = stmt.where(
+                (Destination.state.ilike("%Jammu & Kashmir%"))
+                | (Destination.state.ilike("%Jammu and Kashmir%"))
+            )
+        elif "andaman" in clean_state.lower():
+            stmt = stmt.where(
+                (Destination.state.ilike("%Andaman & Nicobar%"))
+                | (Destination.state.ilike("%Andaman and Nicobar%"))
+            )
+        else:
+            stmt = stmt.where(Destination.state.ilike(f"%{clean_state}%"))
+        applied_filters["state"] = clean_state
 
     if request.is_hidden_gem is not None:
         stmt = stmt.where(Destination.is_hidden_gem == request.is_hidden_gem)
@@ -450,6 +481,7 @@ def get_recommendations(
             entry_fee=item["destination"].entry_fee,
             safety_rating=item["destination"].safety_rating,
             base_crowd_level=item["destination"].base_crowd_level,
+            image_url=getattr(item["destination"], "image_url", None),
             estimated_visit_duration=item["destination"].estimated_visit_duration,
             overall_score=item["adjusted_score"],
             components=item["score_response"].components,
@@ -523,6 +555,7 @@ def find_alternative_destinations(
             entry_fee=item["destination"].entry_fee,
             safety_rating=item["destination"].safety_rating,
             base_crowd_level=item["destination"].base_crowd_level,
+            image_url=getattr(item["destination"], "image_url", None),
             estimated_visit_duration=item["destination"].estimated_visit_duration,
             overall_score=item["adjusted_score"],
             components=item["score_response"].components,

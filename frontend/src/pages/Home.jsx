@@ -1,16 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getHealthStatus } from '../api/healthService';
 import { listDestinations } from '../api/destinationService';
 import DestinationCard from '../components/DestinationCard';
+import { DestinationSkeletons } from '../components/LoadingState';
+import ErrorState from '../components/ErrorState';
+import EmptyState from '../components/EmptyState';
 import { DEFAULT_TRAVEL_HERO } from '../utils/imageHelper';
 
 export default function Home() {
   const navigate = useNavigate();
   const [searchKeyword, setSearchKeyword] = useState('');
   const [featuredDestinations, setFeaturedDestinations] = useState([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
+  const [featuredError, setFeaturedError] = useState(null);
   const [health, setHealth] = useState(null);
   const [showHealthDetails, setShowHealthDetails] = useState(false);
+
+  const fetchFeatured = useCallback(async () => {
+    setFeaturedLoading(true);
+    setFeaturedError(null);
+    try {
+      const data = await listDestinations({ limit: 4 });
+      setFeaturedDestinations(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setFeaturedError(err.message || 'Failed to load featured destinations.');
+    } finally {
+      setFeaturedLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     // Fetch live system health status
@@ -21,17 +39,9 @@ export default function Home() {
         setHealth({ status: 'offline', database_connected: false });
       });
 
-    // Fetch featured destinations for preview
-    listDestinations({ limit: 4 })
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setFeaturedDestinations(data);
-        }
-      })
-      .catch((err) => {
-        console.warn('Featured destinations fetch error:', err.message);
-      });
-  }, []);
+    // Fetch featured destinations
+    fetchFeatured();
+  }, [fetchFeatured]);
 
   const handleHeroSearch = (e) => {
     e.preventDefault();
@@ -152,7 +162,6 @@ export default function Home() {
       {/* ===================================================================
           FEATURED DESTINATIONS PREVIEW
           =================================================================== */}
-      {featuredDestinations.length > 0 && (
         <section style={{ padding: '4rem 1.5rem', backgroundColor: '#ffffff' }}>
           <div className="section-container">
             <div
@@ -180,18 +189,40 @@ export default function Home() {
                   fontSize: '0.95rem',
                 }}
               >
-                View all destinations ({featuredDestinations.length}+) →
+                Explore all 100+ destinations →
               </Link>
             </div>
 
-            <div className="destinations-grid">
-              {featuredDestinations.map((destination) => (
-                <DestinationCard key={destination.id} destination={destination} />
-              ))}
-            </div>
+            {/* Loading state */}
+            {featuredLoading && <DestinationSkeletons count={4} />}
+
+            {/* Error state */}
+            {!featuredLoading && featuredError && (
+              <ErrorState
+                title="Could not load featured destinations"
+                message={featuredError}
+                onRetry={fetchFeatured}
+              />
+            )}
+
+            {/* Empty state */}
+            {!featuredLoading && !featuredError && featuredDestinations.length === 0 && (
+              <EmptyState
+                title="No featured destinations available"
+                message="Connect the database and seed destination records to preview places here."
+              />
+            )}
+
+            {/* Destinations grid */}
+            {!featuredLoading && !featuredError && featuredDestinations.length > 0 && (
+              <div className="destinations-grid">
+                {featuredDestinations.map((destination) => (
+                  <DestinationCard key={destination.id} destination={destination} />
+                ))}
+              </div>
+            )}
           </div>
         </section>
-      )}
 
       {/* ===================================================================
           SYSTEM STATUS SECTION (Subtle & Non-Dominating)
