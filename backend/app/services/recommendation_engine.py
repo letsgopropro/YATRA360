@@ -400,7 +400,7 @@ def get_recommendations(
     """
     API orchestration service retrieving candidates from DB and generating recommendations.
     """
-    stmt = select(Destination)
+    stmt = select(Destination).where(Destination.is_active == True)
     applied_filters: Dict[str, Any] = {}
 
     if request.category and request.category.strip().lower() != "all":
@@ -475,13 +475,19 @@ def get_recommendations(
             destination_name=item["destination"].name,
             slug=item["destination"].slug,
             city=item["destination"].city,
+            district=getattr(item["destination"], "district", None),
             state=item["destination"].state,
             category=item["destination"].category,
             is_hidden_gem=item["destination"].is_hidden_gem,
             entry_fee=item["destination"].entry_fee,
+            budget_category=getattr(item["destination"], "budget_category", None),
             safety_rating=item["destination"].safety_rating,
             base_crowd_level=item["destination"].base_crowd_level,
             image_url=getattr(item["destination"], "image_url", None),
+            image_attribution=getattr(item["destination"], "image_attribution", None),
+            image_license=getattr(item["destination"], "image_license", None),
+            image_source_url=getattr(item["destination"], "image_source_url", None),
+            best_time_to_visit=getattr(item["destination"], "best_time_to_visit", None),
             estimated_visit_duration=item["destination"].estimated_visit_duration,
             overall_score=item["adjusted_score"],
             components=item["score_response"].components,
@@ -520,9 +526,10 @@ def find_alternative_destinations(
             detail=f"Source destination with ID {destination_id} not found",
         )
 
-    # Candidate destinations in same state or category
+    # Candidate destinations in same state or category (active only)
     stmt = (
         select(Destination)
+        .where(Destination.is_active == True)
         .where(Destination.id != destination_id)
         .where(
             or_(
@@ -533,7 +540,12 @@ def find_alternative_destinations(
     )
     candidates = db.scalars(stmt).all()
     if not candidates:
-        candidates = db.scalars(select(Destination).where(Destination.id != destination_id).limit(20)).all()
+        candidates = db.scalars(
+            select(Destination)
+            .where(Destination.is_active == True)
+            .where(Destination.id != destination_id)
+            .limit(20)
+        ).all()
 
     req = request or TravelRequest()
     ranked_alts = recommend_alternatives(
@@ -549,13 +561,19 @@ def find_alternative_destinations(
             destination_name=item["destination"].name,
             slug=item["destination"].slug,
             city=item["destination"].city,
+            district=getattr(item["destination"], "district", None),
             state=item["destination"].state,
             category=item["destination"].category,
             is_hidden_gem=item["destination"].is_hidden_gem,
             entry_fee=item["destination"].entry_fee,
+            budget_category=getattr(item["destination"], "budget_category", None),
             safety_rating=item["destination"].safety_rating,
             base_crowd_level=item["destination"].base_crowd_level,
             image_url=getattr(item["destination"], "image_url", None),
+            image_attribution=getattr(item["destination"], "image_attribution", None),
+            image_license=getattr(item["destination"], "image_license", None),
+            image_source_url=getattr(item["destination"], "image_source_url", None),
+            best_time_to_visit=getattr(item["destination"], "best_time_to_visit", None),
             estimated_visit_duration=item["destination"].estimated_visit_duration,
             overall_score=item["adjusted_score"],
             components=item["score_response"].components,

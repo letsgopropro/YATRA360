@@ -16,7 +16,14 @@ class DestinationBase(BaseModel):
     safety_rating: float = Field(default=4.0, ge=1.0, le=5.0)
     is_hidden_gem: bool = False
     base_crowd_level: str = Field(default="moderate", max_length=20)
-    image_url: Optional[str] = Field(default=None, max_length=500)
+    image_url: Optional[str] = Field(default=None, max_length=1000)
+    district: Optional[str] = Field(default=None, max_length=100)
+    best_time_to_visit: Optional[str] = Field(default=None, max_length=150)
+    budget_category: Optional[str] = Field(default=None, max_length=50)
+    image_attribution: Optional[str] = None
+    image_license: Optional[str] = Field(default=None, max_length=200)
+    image_source_url: Optional[str] = Field(default=None, max_length=1000)
+    is_active: bool = True
     accessibility_info: Optional[str] = None
     estimated_visit_duration: Optional[int] = None
 

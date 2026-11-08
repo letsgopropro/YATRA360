@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { getDestinationImageUrl, handleImageError } from '../utils/imageHelper';
+import { getDestinationImageUrl, handleImageError, getDestinationAttribution } from '../utils/imageHelper';
 
 export default function AlternativeDestinationCard({
   alternative,
@@ -16,15 +16,23 @@ export default function AlternativeDestinationCard({
     category: alternative.category,
   });
 
+  const attribution = getDestinationAttribution(alternative);
   const crowdLevel = (alternative.base_crowd_level || 'moderate').toLowerCase();
 
   // Calculate similarity or display score
   const score = alternative.overall_score || 80;
   const similarityPercent = Math.min(Math.round(score * 0.95), 98);
 
+  const locationText = alternative.district && alternative.district !== alternative.city
+    ? `${alternative.city}, ${alternative.district}, ${alternative.state}`
+    : `${alternative.city}, ${alternative.state}`;
+
   return (
     <div className="alternative-card">
-      <div className="alt-media-wrapper">
+      <div
+        className="alt-media-wrapper"
+        title={attribution ? `Photo: ${attribution.attribution} (${attribution.license})` : alternative.destination_name}
+      >
         <img
           src={imageUrl}
           alt={alternative.destination_name}
@@ -40,8 +48,8 @@ export default function AlternativeDestinationCard({
       <div className="alt-card-body">
         <h4 className="alt-title">{alternative.destination_name}</h4>
         <div className="alt-location">
-          📍 {alternative.city}, {alternative.state}
-        </div>
+          📍 {locationText}        
+          </div>
 
         {/* Explainable comparison text */}
         <p className="alt-reason-text">

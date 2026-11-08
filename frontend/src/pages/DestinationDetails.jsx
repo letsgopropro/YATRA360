@@ -159,6 +159,23 @@ export default function DestinationDetails() {
         />
         <div className="details-hero-overlay"></div>
 
+        {destination.image_attribution && (
+          <div className="details-hero-attribution">
+            <span>📷 Photo: {destination.image_attribution}</span>
+            {destination.image_license && <span> · {destination.image_license}</span>}
+            {destination.image_source_url && (
+              <a
+                href={destination.image_source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hero-attribution-link"
+              >
+                Source ↗
+              </a>
+            )}
+          </div>
+        )}
+
         <div className="details-hero-content">
           <Link to="/destinations" className="back-link-btn">
             ← Back to Destinations
@@ -269,6 +286,16 @@ export default function DestinationDetails() {
                       </div>
                     </div>
 
+                    {destination.district && (
+                      <div className="key-info-item">
+                        <span className="key-info-icon">🗺️</span>
+                        <div>
+                          <div className="key-info-label">District</div>
+                          <div className="key-info-value">{destination.district}</div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="key-info-item">
                       <span className="key-info-icon">🏛️</span>
                       <div>
@@ -284,6 +311,26 @@ export default function DestinationDetails() {
                         <div className="key-info-value">{getCostLabel()}</div>
                       </div>
                     </div>
+
+                    {destination.budget_category && (
+                      <div className="key-info-item">
+                        <span className="key-info-icon">💰</span>
+                        <div>
+                          <div className="key-info-label">Budget Tier</div>
+                          <div className="key-info-value">{destination.budget_category}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {destination.best_time_to_visit && (
+                      <div className="key-info-item">
+                        <span className="key-info-icon">🌤️</span>
+                        <div>
+                          <div className="key-info-label">Best Time to Visit</div>
+                          <div className="key-info-value">{destination.best_time_to_visit}</div>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="key-info-item">
                       <span className="key-info-icon">👥</span>

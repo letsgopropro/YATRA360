@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getDestinationImageUrl, handleImageError } from '../utils/imageHelper';
+import { getDestinationImageUrl, handleImageError, getDestinationAttribution } from '../utils/imageHelper';
 import ScoreBreakdown from './ScoreBreakdown';
 
 export default function RecommendationCard({ recommendation, onFindAlternatives }) {
@@ -15,6 +15,8 @@ export default function RecommendationCard({ recommendation, onFindAlternatives 
     category: recommendation.category,
   });
 
+  const attribution = getDestinationAttribution(recommendation);
+
   const rawScore = Number(recommendation.overall_score) || 0;
   const score10 = (rawScore > 10 ? rawScore / 10 : rawScore).toFixed(1);
   const crowdLevel = (recommendation.base_crowd_level || 'moderate').toLowerCase();
@@ -27,11 +29,18 @@ export default function RecommendationCard({ recommendation, onFindAlternatives 
     return `₹₹₹ (Premium · ₹${fee})`;
   };
 
+  const locationText = recommendation.district && recommendation.district !== recommendation.city
+    ? `${recommendation.city}, ${recommendation.district}, ${recommendation.state}`
+    : `${recommendation.city}, ${recommendation.state}`;
+
   return (
     <div className="recommendation-card-wrapper" style={{ display: 'flex', flexDirection: 'column' }}>
       <div className="recommendation-card">
         {/* Destination photo */}
-        <div className="rec-media-wrapper">
+        <div
+          className="rec-media-wrapper"
+          title={attribution ? `Photo: ${attribution.attribution} (${attribution.license})` : recommendation.destination_name}
+        >
           <img
             src={imageUrl}
             alt={recommendation.destination_name}
@@ -55,7 +64,7 @@ export default function RecommendationCard({ recommendation, onFindAlternatives 
           <div className="rec-title-row">
             <h3 className="rec-title">{recommendation.destination_name}</h3>
             <span className="rec-location">
-              📍 {recommendation.city}, {recommendation.state}
+              📍 {locationText}
             </span>
           </div>
 

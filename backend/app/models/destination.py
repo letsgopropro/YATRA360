@@ -31,7 +31,14 @@ class Destination(Base):
     safety_rating: Mapped[float] = mapped_column(Float, default=4.0, nullable=False)
     is_hidden_gem: Mapped[bool] = mapped_column(Boolean, default=False, index=True, nullable=False)
     base_crowd_level: Mapped[str] = mapped_column(String(20), default="moderate", nullable=False)
-    image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    image_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    district: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    best_time_to_visit: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    budget_category: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    image_attribution: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    image_license: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    image_source_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=func.true(), index=True, nullable=False)
     accessibility_info: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     estimated_visit_duration: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # in minutes
     created_at: Mapped[datetime] = mapped_column(

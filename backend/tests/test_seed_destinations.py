@@ -15,17 +15,17 @@ client = TestClient(app)
 # ============================================================================
 
 def test_seed_dataset_size_and_diversity():
-    """Verify that dataset contains at least 50-100 real destinations across >= 15 states."""
-    assert 50 <= len(DESTINATIONS_DATA) <= 100, f"Expected 50-100 destinations, got {len(DESTINATIONS_DATA)}"
+    """Verify that dataset contains 250 real destinations across all 36 Indian states and union territories."""
+    assert len(DESTINATIONS_DATA) == 250, f"Expected 250 destinations, got {len(DESTINATIONS_DATA)}"
     
     states = {item["state"] for item in DESTINATIONS_DATA}
-    assert len(states) >= 15, f"Expected at least 15 states/UTs, got {len(states)}"
+    assert len(states) == 36, f"Expected all 36 states and UTs, got {len(states)}"
     
     categories = {item["category"] for item in DESTINATIONS_DATA}
-    assert len(categories) >= 6, f"Expected varied categories, got {len(categories)}"
+    assert len(categories) >= 8, f"Expected varied categories, got {len(categories)}"
     
     hidden_gems = [item for item in DESTINATIONS_DATA if item["is_hidden_gem"]]
-    assert len(hidden_gems) >= 20, f"Expected meaningful hidden gems, got {len(hidden_gems)}"
+    assert len(hidden_gems) >= 80, f"Expected meaningful hidden gems, got {len(hidden_gems)}"
 
 
 def test_seed_dataset_fields_and_geographic_boundaries():
@@ -58,8 +58,9 @@ def test_seed_dataset_fields_and_geographic_boundaries():
         assert 1.0 <= item["safety_rating"] <= 5.0, f"Safety rating out of bounds for {item['name']}"
         assert item["base_crowd_level"] in {"low", "moderate", "high"}, f"Invalid crowd level for {item['name']}"
         
-        # Prototype compliance
-        assert item["image_url"] is None, f"Image URL must be None for {item['name']}"
+        # Image and attribution compliance
+        assert item["image_url"] is not None and item["image_url"].startswith("http"), f"Image URL must be a valid HTTP URL for {item['name']}"
+        assert item["image_attribution"] is not None and item["image_attribution"].strip(), f"Image attribution missing for {item['name']}"
 
 
 # ============================================================================
@@ -154,7 +155,8 @@ def test_api_destination_get_by_slug():
     assert data["entry_fee"] == 50.0
     assert data["latitude"] == pytest.approx(27.1751, rel=1e-3)
     assert data["longitude"] == pytest.approx(78.0421, rel=1e-3)
-    assert data["image_url"] is None
+    assert data["image_url"] is not None and data["image_url"].startswith("http")
+    assert data["image_attribution"] is not None
 
 
 def test_api_destination_get_by_id():

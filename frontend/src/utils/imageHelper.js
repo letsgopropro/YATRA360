@@ -109,16 +109,21 @@ export function resolveCategoryName(rawCategory) {
 
 /**
  * Returns a high-res travel image URL for a destination.
+ * Prioritizes actual destination photography from the database.
  */
 export function getDestinationImageUrl(destination) {
   if (!destination) return DEFAULT_TRAVEL_HERO;
 
-  // 1. If backend has an image URL
-  if (destination.image_url && typeof destination.image_url === 'string' && destination.image_url.trim().length > 0) {
+  // 1. Primary: actual authentic destination image URL from database
+  if (
+    destination.image_url &&
+    typeof destination.image_url === 'string' &&
+    destination.image_url.trim().length > 0
+  ) {
     return destination.image_url.trim();
   }
 
-  // 2. Check by slug keywords or name keywords
+  // 2. Secondary check by destination slug or name keywords
   const slug = (destination.slug || '').toLowerCase();
   const name = (destination.name || destination.destination_name || '').toLowerCase();
 
@@ -128,7 +133,7 @@ export function getDestinationImageUrl(destination) {
     }
   }
 
-  // 3. Fallback to category with normalization
+  // 3. Fallback to category curated photography
   const resolvedCategory = resolveCategoryName(destination.category);
   if (resolvedCategory && CATEGORY_FALLBACK_IMAGES[resolvedCategory]) {
     return CATEGORY_FALLBACK_IMAGES[resolvedCategory];
@@ -136,6 +141,23 @@ export function getDestinationImageUrl(destination) {
 
   // 4. Default aesthetic scenery
   return DEFAULT_TRAVEL_HERO;
+}
+
+/**
+ * Extracts and formats photographic attribution metadata for a destination
+ */
+export function getDestinationAttribution(destination) {
+  if (!destination) return null;
+  const attribution = destination.image_attribution;
+  const license = destination.image_license;
+  const sourceUrl = destination.image_source_url;
+
+  if (!attribution && !license) return null;
+  return {
+    attribution: attribution || 'Wikimedia Commons Contributor',
+    license: license || 'Creative Commons',
+    sourceUrl: sourceUrl || null,
+  };
 }
 
 /**

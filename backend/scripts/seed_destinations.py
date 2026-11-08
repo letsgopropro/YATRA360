@@ -87,6 +87,7 @@ def seed_destinations(
                     existing.category = item["category"]
                     existing.state = item["state"]
                     existing.city = item["city"]
+                    existing.district = item.get("district")
                     existing.latitude = item["latitude"]
                     existing.longitude = item["longitude"]
                     existing.entry_fee = item["entry_fee"]
@@ -94,8 +95,14 @@ def seed_destinations(
                     existing.is_hidden_gem = item["is_hidden_gem"]
                     existing.base_crowd_level = item["base_crowd_level"]
                     existing.image_url = item["image_url"]
-                    existing.accessibility_info = item["accessibility_info"]
-                    existing.estimated_visit_duration = item["estimated_visit_duration"]
+                    existing.image_attribution = item.get("image_attribution")
+                    existing.image_license = item.get("image_license")
+                    existing.image_source_url = item.get("image_source_url")
+                    existing.best_time_to_visit = item.get("best_time_to_visit")
+                    existing.budget_category = item.get("budget_category")
+                    existing.accessibility_info = item.get("accessibility_info")
+                    existing.estimated_visit_duration = item.get("estimated_visit_duration")
+                    existing.is_active = True
                     stats["updated"] += 1
                     print(f"  [{idx}/{stats['total']}] [UPDATED] {name} ({city}, {state})")
                 else:
@@ -109,6 +116,7 @@ def seed_destinations(
                     category=item["category"],
                     state=item["state"],
                     city=item["city"],
+                    district=item.get("district"),
                     latitude=item["latitude"],
                     longitude=item["longitude"],
                     entry_fee=item["entry_fee"],
@@ -116,8 +124,14 @@ def seed_destinations(
                     is_hidden_gem=item["is_hidden_gem"],
                     base_crowd_level=item["base_crowd_level"],
                     image_url=item["image_url"],
-                    accessibility_info=item["accessibility_info"],
-                    estimated_visit_duration=item["estimated_visit_duration"],
+                    image_attribution=item.get("image_attribution"),
+                    image_license=item.get("image_license"),
+                    image_source_url=item.get("image_source_url"),
+                    best_time_to_visit=item.get("best_time_to_visit"),
+                    budget_category=item.get("budget_category"),
+                    accessibility_info=item.get("accessibility_info"),
+                    estimated_visit_duration=item.get("estimated_visit_duration"),
+                    is_active=True,
                 )
                 db.add(new_dest)
                 stats["inserted"] += 1

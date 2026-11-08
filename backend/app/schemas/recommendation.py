@@ -59,6 +59,12 @@ class RecommendationItem(BaseModel):
     safety_rating: float
     base_crowd_level: str
     image_url: Optional[str] = None
+    district: Optional[str] = None
+    best_time_to_visit: Optional[str] = None
+    budget_category: Optional[str] = None
+    image_attribution: Optional[str] = None
+    image_license: Optional[str] = None
+    image_source_url: Optional[str] = None
     estimated_visit_duration: Optional[int] = None
     overall_score: float = Field(..., ge=0.0, le=100.0)
     components: ScoringComponents

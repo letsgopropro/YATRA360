@@ -57,7 +57,7 @@ def collect_destination_data(
     1. Validates and parses the user's travel request (destination, budget, time, interests, travel group).
     2. Queries the database and retrieves matching destination data (name, coordinates, crowd, safety, cost, accessibility).
     """
-    stmt = select(Destination)
+    stmt = select(Destination).where(Destination.is_active == True)
 
     # Filter by destination/city/state if provided
     if travel_request.destination:
@@ -90,7 +90,7 @@ def collect_destination_data(
 
     # If strict search yielded 0 results, fallback to broader state or all destinations
     if not destinations and travel_request.destination:
-        destinations = db.scalars(select(Destination).limit(10)).all()
+        destinations = db.scalars(select(Destination).where(Destination.is_active == True).limit(10)).all()
 
     collected = [
         CollectedDestination(
@@ -98,13 +98,20 @@ def collect_destination_data(
             name=d.name,
             slug=d.slug,
             city=d.city,
+            district=d.district,
             state=d.state,
             category=d.category,
             latitude=d.latitude,
             longitude=d.longitude,
             entry_fee=d.entry_fee,
+            budget_category=d.budget_category,
             safety_rating=d.safety_rating,
             base_crowd_level=d.base_crowd_level,
+            image_url=d.image_url,
+            image_attribution=d.image_attribution,
+            image_license=d.image_license,
+            image_source_url=d.image_source_url,
+            best_time_to_visit=d.best_time_to_visit,
             accessibility_info=d.accessibility_info,
             estimated_visit_duration=d.estimated_visit_duration,
             is_hidden_gem=d.is_hidden_gem,
@@ -129,14 +136,17 @@ def list_destinations(
     is_hidden_gem: Optional[bool] = Query(None, description="Filter hidden gems"),
     crowd_level: Optional[str] = Query(None, description="Filter by base crowd level"),
     search: Optional[str] = Query(None, description="Search keyword in name or description"),
+    include_inactive: bool = Query(False, description="Include inactive/test destinations"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(60, ge=1, le=300),
     db: Session = Depends(get_db)
 ) -> Any:
     """
     List destinations with filtering by category, city, state, hidden-gem status, and crowd level.
     """
     stmt = select(Destination)
+    if not include_inactive:
+        stmt = stmt.where(Destination.is_active == True)
 
     if category and category.strip().lower() != "all":
         clean_cat = category.strip()

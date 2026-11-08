@@ -1,12 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { getDestinationImageUrl, handleImageError } from '../utils/imageHelper';
+import { getDestinationImageUrl, handleImageError, getDestinationAttribution } from '../utils/imageHelper';
 
 export default function DestinationCard({ destination }) {
   if (!destination) return null;
 
   const imageUrl = getDestinationImageUrl(destination);
   const crowdLevel = (destination.base_crowd_level || 'moderate').toLowerCase();
+  const attribution = getDestinationAttribution(destination);
 
   const getCostLabel = () => {
     const fee = destination.entry_fee;
@@ -16,9 +17,16 @@ export default function DestinationCard({ destination }) {
     return `₹₹₹ (Premium · ₹${fee})`;
   };
 
+  const locationText = destination.district && destination.district !== destination.city
+    ? `${destination.city}, ${destination.district}, ${destination.state}`
+    : `${destination.city}, ${destination.state}`;
+
   return (
     <Link to={`/destinations/${destination.id}`} className="destination-card">
-      <div className="card-media-wrapper">
+      <div
+        className="card-media-wrapper"
+        title={attribution ? `Photo: ${attribution.attribution} (${attribution.license})` : destination.name}
+      >
         <img
           src={imageUrl}
           alt={destination.name}
@@ -41,9 +49,7 @@ export default function DestinationCard({ destination }) {
         <h3 className="card-title">{destination.name}</h3>
         <div className="card-location">
           <span>📍</span>
-          <span>
-            {destination.city}, {destination.state}
-          </span>
+          <span>{locationText}</span>
         </div>
 
         <div className="card-meta-row">
