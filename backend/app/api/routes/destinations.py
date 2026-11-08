@@ -1,6 +1,6 @@
 from typing import Any, List, Optional
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from sqlalchemy import desc, or_, select
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
+from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
@@ -128,6 +128,64 @@ def collect_destination_data(
     )
 
 
+def _build_destination_filter_conditions(
+    category: Optional[str] = None,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    is_hidden_gem: Optional[bool] = None,
+    crowd_level: Optional[str] = None,
+    search: Optional[str] = None,
+    include_inactive: bool = False,
+) -> list:
+    """Build reusable SQLAlchemy filter conditions for destination queries."""
+    conditions = []
+    if not include_inactive:
+        conditions.append(Destination.is_active == True)
+
+    if category and category.strip().lower() != "all":
+        clean_cat = category.strip()
+        canon = resolve_canonical_category(clean_cat)
+        if canon:
+            conditions.append(Destination.category.ilike(f"%{canon}%"))
+        elif clean_cat.lower() in THEMATIC_INTEREST_CORRELATIONS:
+            corr_cats = THEMATIC_INTEREST_CORRELATIONS[clean_cat.lower()]["correlated_categories"]
+            conditions.append(Destination.category.in_(list(corr_cats)))
+        else:
+            conditions.append(Destination.category.ilike(f"%{clean_cat}%"))
+
+    if city:
+        conditions.append(Destination.city.ilike(f"%{city.strip()}%"))
+
+    if state and state.strip().lower() not in ("all", "all states"):
+        clean_state = state.strip()
+        if "jammu" in clean_state.lower():
+            conditions.append(
+                (Destination.state.ilike("%Jammu & Kashmir%"))
+                | (Destination.state.ilike("%Jammu and Kashmir%"))
+            )
+        elif "andaman" in clean_state.lower():
+            conditions.append(
+                (Destination.state.ilike("%Andaman & Nicobar%"))
+                | (Destination.state.ilike("%Andaman and Nicobar%"))
+            )
+        else:
+            conditions.append(Destination.state.ilike(f"%{clean_state}%"))
+
+    if is_hidden_gem is not None:
+        conditions.append(Destination.is_hidden_gem == is_hidden_gem)
+
+    if crowd_level:
+        conditions.append(Destination.base_crowd_level.ilike(f"%{crowd_level.strip()}%"))
+
+    if search:
+        term = f"%{search.strip()}%"
+        conditions.append(
+            (Destination.name.ilike(term)) | (Destination.description.ilike(term))
+        )
+
+    return conditions
+
+
 @router.get("", response_model=List[DestinationResponse])
 def list_destinations(
     category: Optional[str] = Query(None, description="Filter by category (e.g. Heritage, Nature)"),
@@ -136,57 +194,119 @@ def list_destinations(
     is_hidden_gem: Optional[bool] = Query(None, description="Filter hidden gems"),
     crowd_level: Optional[str] = Query(None, description="Filter by base crowd level"),
     search: Optional[str] = Query(None, description="Search keyword in name or description"),
+    sort_by: Optional[str] = Query("id", description="Sort field: id, name, safety_rating, entry_fee"),
+    sort_order: Optional[str] = Query("asc", description="Sort direction: asc or desc"),
     include_inactive: bool = Query(False, description="Include inactive/test destinations"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(60, ge=1, le=300),
+    limit: int = Query(60, ge=1, le=500),
+    response: Response = None,
     db: Session = Depends(get_db)
 ) -> Any:
     """
-    List destinations with filtering by category, city, state, hidden-gem status, and crowd level.
+    List destinations with filtering, sorting, pagination, and total match count in X-Total-Count header.
     """
+    conditions = _build_destination_filter_conditions(
+        category=category,
+        city=city,
+        state=state,
+        is_hidden_gem=is_hidden_gem,
+        crowd_level=crowd_level,
+        search=search,
+        include_inactive=include_inactive,
+    )
+
+    # 1. Total matching count
+    count_stmt = select(func.count(Destination.id))
+    if conditions:
+        count_stmt = count_stmt.where(*conditions)
+    total_count = db.scalar(count_stmt) or 0
+
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total_count)
+        response.headers["Access-Control-Expose-Headers"] = "X-Total-Count"
+
+    # 2. Query destinations
     stmt = select(Destination)
-    if not include_inactive:
-        stmt = stmt.where(Destination.is_active == True)
+    if conditions:
+        stmt = stmt.where(*conditions)
 
-    if category and category.strip().lower() != "all":
-        clean_cat = category.strip()
-        canon = resolve_canonical_category(clean_cat)
-        if canon:
-            stmt = stmt.where(Destination.category.ilike(f"%{canon}%"))
-        elif clean_cat.lower() in THEMATIC_INTEREST_CORRELATIONS:
-            corr_cats = THEMATIC_INTEREST_CORRELATIONS[clean_cat.lower()]["correlated_categories"]
-            stmt = stmt.where(Destination.category.in_(list(corr_cats)))
-        else:
-            stmt = stmt.where(Destination.category.ilike(f"%{clean_cat}%"))
-    if city:
-        stmt = stmt.where(Destination.city.ilike(f"%{city.strip()}%"))
-    if state and state.strip().lower() not in ("all", "all states"):
-        clean_state = state.strip()
-        if "jammu" in clean_state.lower():
-            stmt = stmt.where(
-                (Destination.state.ilike("%Jammu & Kashmir%"))
-                | (Destination.state.ilike("%Jammu and Kashmir%"))
-            )
-        elif "andaman" in clean_state.lower():
-            stmt = stmt.where(
-                (Destination.state.ilike("%Andaman & Nicobar%"))
-                | (Destination.state.ilike("%Andaman and Nicobar%"))
-            )
-        else:
-            stmt = stmt.where(Destination.state.ilike(f"%{clean_state}%"))
-    if is_hidden_gem is not None:
-        stmt = stmt.where(Destination.is_hidden_gem == is_hidden_gem)
-    if crowd_level:
-        stmt = stmt.where(Destination.base_crowd_level.ilike(f"%{crowd_level.strip()}%"))
-    if search:
-        term = f"%{search.strip()}%"
-        stmt = stmt.where(
-            (Destination.name.ilike(term)) | (Destination.description.ilike(term))
-        )
+    # Sorting
+    if sort_by == "name":
+        order_col = desc(Destination.name) if sort_order == "desc" else asc(Destination.name)
+    elif sort_by == "safety_rating":
+        order_col = asc(Destination.safety_rating) if sort_order == "asc" else desc(Destination.safety_rating)
+    elif sort_by == "entry_fee":
+        order_col = desc(Destination.entry_fee) if sort_order == "desc" else asc(Destination.entry_fee)
+    else:
+        order_col = desc(Destination.id) if sort_order == "desc" else asc(Destination.id)
 
-    stmt = stmt.order_by(Destination.id).offset(skip).limit(limit)
+    stmt = stmt.order_by(order_col).offset(skip).limit(limit)
     destinations = db.scalars(stmt).all()
     return destinations
+
+
+@router.get("/stats", summary="Get overall destination database statistics")
+def get_destinations_stats(
+    db: Session = Depends(get_db)
+) -> Any:
+    """Return platform-wide active destination counts and distribution metrics."""
+    total_active = db.scalar(
+        select(func.count(Destination.id)).where(Destination.is_active == True)
+    ) or 0
+    total_all = db.scalar(select(func.count(Destination.id))) or 0
+    total_inactive = total_all - total_active
+    hidden_gems = db.scalar(
+        select(func.count(Destination.id)).where(
+            Destination.is_active == True, Destination.is_hidden_gem == True
+        )
+    ) or 0
+    states_count = db.scalar(
+        select(func.count(func.distinct(Destination.state))).where(
+            Destination.is_active == True
+        )
+    ) or 0
+    categories_count = db.scalar(
+        select(func.count(func.distinct(Destination.category))).where(
+            Destination.is_active == True
+        )
+    ) or 0
+
+    return {
+        "total_active": total_active,
+        "total_inactive": total_inactive,
+        "total_all": total_all,
+        "hidden_gems_count": hidden_gems,
+        "states_count": states_count,
+        "categories_count": categories_count,
+    }
+
+
+@router.get("/count", summary="Get count of destinations matching filters")
+def get_destinations_count(
+    category: Optional[str] = Query(None, description="Filter by category"),
+    city: Optional[str] = Query(None, description="Filter by city"),
+    state: Optional[str] = Query(None, description="Filter by state"),
+    is_hidden_gem: Optional[bool] = Query(None, description="Filter hidden gems"),
+    crowd_level: Optional[str] = Query(None, description="Filter by crowd level"),
+    search: Optional[str] = Query(None, description="Search keyword"),
+    include_inactive: bool = Query(False, description="Include inactive/test destinations"),
+    db: Session = Depends(get_db)
+) -> Any:
+    """Return total count of destinations matching specified query filters."""
+    conditions = _build_destination_filter_conditions(
+        category=category,
+        city=city,
+        state=state,
+        is_hidden_gem=is_hidden_gem,
+        crowd_level=crowd_level,
+        search=search,
+        include_inactive=include_inactive,
+    )
+    count_stmt = select(func.count(Destination.id))
+    if conditions:
+        count_stmt = count_stmt.where(*conditions)
+    total_count = db.scalar(count_stmt) or 0
+    return {"total": total_count}
 
 
 @router.get("/slug/{slug}", response_model=DestinationResponse)

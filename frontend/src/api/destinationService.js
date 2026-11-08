@@ -9,6 +9,14 @@ export async function listDestinations(params = {}) {
   return await apiClient.get('/destinations', params);
 }
 
+export async function getDestinationStats() {
+  return await apiClient.get('/destinations/stats');
+}
+
+export async function getDestinationsCount(params = {}) {
+  return await apiClient.get('/destinations/count', params);
+}
+
 export async function getDestinationById(id) {
   return await apiClient.get(`/destinations/${id}`);
 }
@@ -39,6 +47,8 @@ export async function scoreDestination(id, travelRequest = null) {
 
 export default {
   listDestinations,
+  getDestinationStats,
+  getDestinationsCount,
   getDestinationById,
   getDestinationBySlug,
   getDestinationCrowd,

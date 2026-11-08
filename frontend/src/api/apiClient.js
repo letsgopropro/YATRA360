@@ -62,7 +62,23 @@ export async function request(endpoint, options = {}) {
       return null;
     }
 
-    return await response.json();
+    const data = await response.json();
+
+    // Attach X-Total-Count metadata to array responses if present
+    const totalCountHeader = response.headers.get('x-total-count');
+    if (totalCountHeader !== null && Array.isArray(data)) {
+      const parsedTotal = parseInt(totalCountHeader, 10);
+      if (!Number.isNaN(parsedTotal)) {
+        Object.defineProperty(data, 'totalCount', {
+          value: parsedTotal,
+          writable: true,
+          enumerable: false,
+          configurable: true,
+        });
+      }
+    }
+
+    return data;
   } catch (error) {
     console.error(`[API Client Error] ${endpoint}:`, error);
     throw error;

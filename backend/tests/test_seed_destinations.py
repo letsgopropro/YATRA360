@@ -187,3 +187,53 @@ def test_api_destination_crowd_and_safety_endpoints():
     safety_resp = client.get(f"/api/destinations/{dest_id}/safety")
     assert safety_resp.status_code == 200
     assert safety_resp.json()["safety_rating"] == 4.0
+
+
+def test_api_destination_stats_endpoint():
+    """Verify /api/destinations/stats returns accurate platform catalog counts."""
+    response = client.get("/api/destinations/stats")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_active"] == 250
+    assert data["total_inactive"] == 21
+    assert data["total_all"] == 271
+    assert data["states_count"] == 36
+    assert data["categories_count"] >= 8
+    assert data["hidden_gems_count"] >= 100
+
+
+def test_api_destination_count_and_headers():
+    """Verify /api/destinations/count and X-Total-Count header."""
+    # Unfiltered count
+    resp_count = client.get("/api/destinations/count")
+    assert resp_count.status_code == 200
+    assert resp_count.json()["total"] == 250
+
+    # Filtered count
+    resp_kerala = client.get("/api/destinations/count?state=Kerala")
+    assert resp_kerala.status_code == 200
+    assert resp_kerala.json()["total"] == 12
+
+    # List endpoint header
+    resp_list = client.get("/api/destinations?limit=24&skip=0")
+    assert resp_list.status_code == 200
+    assert resp_list.headers.get("x-total-count") == "250"
+    assert len(resp_list.json()) == 24
+
+
+def test_api_pagination_covers_all_250_destinations_without_duplicates():
+    """Verify pagination across all pages retrieves exactly 250 unique active destinations."""
+    page_size = 24
+    total_expected = 250
+    collected_ids = []
+
+    for skip in range(0, total_expected, page_size):
+        resp = client.get(f"/api/destinations?limit={page_size}&skip={skip}")
+        assert resp.status_code == 200
+        items = resp.json()
+        assert len(items) <= page_size
+        collected_ids.extend([item["id"] for item in items])
+
+    assert len(collected_ids) == 250, f"Expected 250 total items, got {len(collected_ids)}"
+    assert len(set(collected_ids)) == 250, "Duplicate destination IDs detected across pagination pages!"
+

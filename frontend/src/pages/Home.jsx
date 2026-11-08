@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getHealthStatus } from '../api/healthService';
-import { listDestinations } from '../api/destinationService';
+import { listDestinations, getDestinationStats } from '../api/destinationService';
 import DestinationCard from '../components/DestinationCard';
 import { DestinationSkeletons } from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
@@ -16,6 +16,7 @@ export default function Home() {
   const [featuredError, setFeaturedError] = useState(null);
   const [health, setHealth] = useState(null);
   const [showHealthDetails, setShowHealthDetails] = useState(false);
+  const [destinationStats, setDestinationStats] = useState(null);
 
   const fetchFeatured = useCallback(async () => {
     setFeaturedLoading(true);
@@ -41,6 +42,11 @@ export default function Home() {
 
     // Fetch featured destinations
     fetchFeatured();
+
+    // Fetch dynamic destination catalog stats
+    getDestinationStats()
+      .then((data) => setDestinationStats(data))
+      .catch((err) => console.warn('Destination stats issue:', err.message));
   }, [fetchFeatured]);
 
   const handleHeroSearch = (e) => {
@@ -189,7 +195,7 @@ export default function Home() {
                   fontSize: '0.95rem',
                 }}
               >
-                Explore all 100+ destinations →
+                Explore all {destinationStats?.total_active ? `${destinationStats.total_active}` : '250+'} destinations →
               </Link>
             </div>
 
